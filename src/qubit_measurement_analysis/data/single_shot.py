@@ -177,6 +177,12 @@ class SingleShot:
 
         if not isinstance(meas_time, np.ndarray) or meas_time.ndim != 1:
             raise TypeError("meas_time must be a 1D numpy array")
+
+        if not self.shape[-1] == meas_time.shape[-1]:
+            raise ValueError(
+                f"Expecting `self` and `meas_time` have the same last dimension, but got {self.shape[-1]} and {meas_time.shape[-1]}"
+            )
+
         num_freqs = len(intermediate_freq)
         value_new = np.tile(self.value, (num_freqs, 1))
         meas_time_new = np.tile(meas_time, (num_freqs, 1))
