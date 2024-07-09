@@ -7,6 +7,10 @@ from typing import Dict
 import numpy as np
 import scipy.sparse
 
+from qubit_measurement_analysis.visualization.single_shot_plotter import (
+    SigngleShotPlotter as ssp,
+)
+
 
 class SingleShot:
     """Dataclass for storing a single SingleShot entity."""
@@ -30,6 +34,7 @@ class SingleShot:
 
         self._is_demodulated: bool = self.value.shape[0] > 1
         self.id = str(uuid.uuid4())  # Generate a unique ID for the SingleShot instance
+        self._plotter = ssp(children=self)
 
     def __getitem__(self, index) -> "SingleShot":
         """Get a slice of the value array.
@@ -88,6 +93,14 @@ class SingleShot:
     def shape(self) -> tuple:
         """tuple: Shape of the value array."""
         return self.value.shape
+
+    def scatter(self, ax=None, **kwargs):
+        # TODO: add docstring
+        return self._plotter.scatter(ax, **kwargs)
+
+    def plot(self, ax=None, x=None, **kwargs):
+        # TODO: add docstring
+        return self._plotter.plot(ax, x, **kwargs)
 
     def mean(self, axis: int = -1) -> "SingleShot":
         """Calculate the mean of the SingleShot values.

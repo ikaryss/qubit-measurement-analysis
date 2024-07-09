@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qubit-measurement-analysis"
-version = "0.1.0"
+version = "0.2.0"
 description = "Tools for analyzing in-phase / quadrature signals from superconducting quantum systems"
 authors = ["Nikolai Zhitkov <kolya.zhitkov@gmail.com>"]
 readme = "README.md"
