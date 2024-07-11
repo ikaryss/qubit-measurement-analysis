@@ -25,10 +25,13 @@ class SingleShot:
         # TODO: change docstring
         if not isinstance(value, np.ndarray):
             raise TypeError(
-                "value must be a numpy array of complex64 or float (int) elements"
+                "value must be a numpy array of complex or float (int) elements"
             )
-        if value.dtype != np.complex64:
+        if value.dtype != complex:
             value = self._from_real(value)
+        if value.dtype != np.complex64:
+            value = value.astype(np.complex64)
+
         self.value = value if value.ndim > 1 else value.reshape(1, -1)
         self._state_regs = state_regs
 
