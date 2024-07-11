@@ -27,7 +27,7 @@ class SingleShot:
             raise TypeError(
                 "value must be a numpy array of complex or float (int) elements"
             )
-        if value.dtype != complex:
+        if not np.issubdtype(value.dtype, np.complexfloating):
             value = self._from_real(value)
         if value.dtype != np.complex64:
             value = value.astype(np.complex64)
