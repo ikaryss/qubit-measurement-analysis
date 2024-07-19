@@ -19,6 +19,7 @@ commitizen = "^3.27.0"
 black = "^24.4.2"
 mypy = "^1.10.0"
 notebook = "^7.2.1"
+sphinx = "^7.4.6"
 
 
 [tool.commitizen]
