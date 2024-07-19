@@ -4,6 +4,7 @@ from matplotlib import axes, pyplot as plt
 from qubit_measurement_analysis.visualization.base_plotter import (
     BasicShotPlotter as bsp,
 )
+from qubit_measurement_analysis.visualization.utils import _get_current_kwargs
 
 
 class SigngleShotPlotter:
@@ -14,6 +15,7 @@ class SigngleShotPlotter:
 
     def scatter(self, ax: axes.Axes = None, **kwargs):
         # TODO: add docstring
+        # TODO: add notion about passing iterable kwargs
         q_registers = (
             self.children.q_registers
             if self.children.is_demodulated
@@ -30,17 +32,19 @@ class SigngleShotPlotter:
                     if self.children.is_demodulated
                     else None
                 )
+            current_kwargs = _get_current_kwargs(kwargs, reg_idx)
             _ = bsp.scatter_matplotlib(
                 ax,
                 self.children.value[reg_idx, :],
                 label=qubit,
                 marker=marker,
-                **kwargs,
+                **current_kwargs,
             )
         return ax
 
     def plot(self, ax: axes.Axes = None, x: Iterable = None, **kwargs):
         # TODO: add docstring
+        # TODO: add notion about passing iterable kwargs
         q_registers = (
             self.children.q_registers
             if self.children.is_demodulated
@@ -51,12 +55,12 @@ class SigngleShotPlotter:
             _, ax = plt.subplots()
 
         for reg_idx, qubit in enumerate(q_registers):
-
+            current_kwargs = _get_current_kwargs(kwargs, reg_idx)
             _ = bsp.plot_matplotlib(
                 ax,
                 self.children.value[reg_idx, :],
                 label=qubit,
                 x=x,
-                **kwargs,
+                **current_kwargs,
             )
         return ax

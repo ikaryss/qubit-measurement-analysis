@@ -3,6 +3,8 @@ from typing import Union, Iterable
 from matplotlib import axes
 import numpy as np
 
+from qubit_measurement_analysis.visualization.utils import _get_current_kwargs
+
 
 class BasicShotPlotter:
     """Class for generating basic plots."""
@@ -31,10 +33,15 @@ class BasicShotPlotter:
     ):
         """Generate a basic line plot using Matplotlib"""
         x = x if x is not None else np.arange(value.shape[-1])
+        current_kwargs = _get_current_kwargs(kwargs, 0)
         in_phase = ax.plot(
-            x, value.real.flatten(), label=f"in-phase-reg({label})", **kwargs
+            x, value.real.flatten(), label=f"in-phase-reg({label})", **current_kwargs
         )
+        current_kwargs = _get_current_kwargs(kwargs, 1)
         quadrature = ax.plot(
-            x, value.imag.flatten(), label=f"quadrature-reg({label})", **kwargs
+            x,
+            value.imag.flatten(),
+            label=f"quadrature-reg({label})",
+            **current_kwargs,
         )
         return in_phase, quadrature

@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 from qubit_measurement_analysis.visualization.base_plotter import (
     BasicShotPlotter as bsp,
 )
+from qubit_measurement_analysis.visualization.utils import _get_current_kwargs
 
 
 class CollectionPlotter:
@@ -27,7 +28,8 @@ class CollectionPlotter:
         for state in states:
             collection = self.children.filter_by_state(state)
             for reg_idx, reg in enumerate(q_registers):
-                if kwargs.get("marker") is None:
+                current_kwargs = _get_current_kwargs(kwargs, reg_idx)
+                if current_kwargs.get("marker") is None:
                     marker = (
                         f"${state[reg_idx : len(reg) + reg_idx]}$"
                         if self.children.is_demodulated
@@ -38,6 +40,6 @@ class CollectionPlotter:
                     collection.all_values[:, reg_idx, :],
                     label=reg,
                     marker=marker,
-                    **kwargs,
+                    **current_kwargs,
                 )
         return ax
