@@ -8,7 +8,7 @@ import numpy as np
 import scipy.sparse
 
 from qubit_measurement_analysis.visualization.single_shot_plotter import (
-    SigngleShotPlotter as ssp,
+    SingleShotPlotter as ssp,
 )
 
 

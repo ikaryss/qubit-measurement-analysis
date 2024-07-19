@@ -7,7 +7,7 @@ from qubit_measurement_analysis.visualization.base_plotter import (
 from qubit_measurement_analysis.visualization.utils import _get_current_kwargs
 
 
-class SigngleShotPlotter:
+class SingleShotPlotter:
     # TODO: describe functionality of the class
 
     def __init__(self, children) -> None:
