@@ -164,7 +164,7 @@ class SingleShot:
         return "".join(self.state_regs.values())
 
     @property
-    def state_regs(self):
+    def state_regs(self) -> Dict[int, str]:
         """Get the state registers dictionary.
 
         Returns:
@@ -226,7 +226,15 @@ class SingleShot:
         """Center the SingleShot values by subtracting the mean.
 
         Returns:
-            SingleShot: A new SingleShot instance with centered values.
+        SingleShot: A new SingleShot instance with centered values.
+
+        Example:
+        >>> data = np.array([1+1j, 2+2j, 3+3j])
+        >>> state_regs = {0: '0', 1: '1'}
+        >>> single_shot = SingleShot(data, state_regs)
+        >>> centered = single_shot.mean_centring()
+        >>> print(centered)
+        SingleShot(value=[-1.-1.j 0.+0.j 1.+1.j], state_regs='{0: '0', 1: '1'}')
         """
         centered_value = self.value - self.mean().value
         return SingleShot(centered_value, self.state_regs)
