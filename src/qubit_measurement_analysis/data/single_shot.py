@@ -1,4 +1,9 @@
-"Data processing functionality for Single-Shots"
+"""Data processing functionality for Single-Shots.
+
+This module provides the SingleShot class for storing and processing single-shot
+measurement data in quantum experiments.
+"""
+
 import os
 import uuid
 import glob
@@ -13,20 +18,48 @@ from qubit_measurement_analysis.visualization.single_shot_plotter import (
 
 
 class SingleShot:
-    """Dataclass for storing a single SingleShot entity."""
+    """A class for storing and processing a single SingleShot entity.
+
+    This class represents a single-shot measurement in quantum experiments,
+    providing methods for data manipulation, analysis, and visualization.
+
+    Attributes:
+    value (np.ndarray): The measurement data.
+    id (str): A unique identifier for the SingleShot instance.
+    _state_regs (Dict[int, str]): A dictionary mapping qubit numbers to states.
+    _is_demodulated (bool): Indicates whether the data has been demodulated.
+    _plotter (SingleShotPlotter): A plotter object for visualization.
+
+    Example:
+    >>> import numpy as np
+    >>> data = np.array([1+1j, 2+2j, 3+3j])
+    >>> state_regs = {0: '0', 1: '1'}
+    >>> single_shot = SingleShot(data, state_regs)
+    >>> print(single_shot)
+    SingleShot(value=[ 1.+1.j 2.+2.j 3.+3.j], state_regs='{0: '0', 1: '1'}')
+    """
 
     def __init__(self, value: np.ndarray, state_regs: Dict[int, str]) -> None:
         """Initialize a SingleShot instance.
 
         Args:
-            value (np.ndarray): A numpy array of `np.complex64` or `float` elements.
-            state_regs (Dict[int, str]): _description_
+        value (np.ndarray): A numpy array of `np.complex64` or `float` elements.
+        state_regs (Dict[int, str]): A dictionary mapping qubit numbers to states.
+
+        Raises:
+        TypeError: If value is not a numpy array of complex or float elements.
+
+        Example:
+        >>> data = np.array([1+1j, 2+2j, 3+3j])
+        >>> state_regs = {0: '0', 1: '1'}
+        >>> single_shot = SingleShot(data, state_regs)
         """
-        # TODO: change docstring
         if not isinstance(value, np.ndarray):
             raise TypeError(
                 "value must be a numpy array of complex or float (int) elements"
             )
+        if value.ndim > 1 and np.issubdtype(value.dtype, np.complexfloating):
+            raise ValueError("value of complex dtype must be 1 dimensional")
         if not np.issubdtype(value.dtype, np.complexfloating):
             value = self._from_real(value)
         if value.dtype != np.complex64:
@@ -44,9 +77,18 @@ class SingleShot:
         """Get a slice of the value array.
 
         Args:
-            index: Index or slice to retrieve.
+        index: Index or slice to retrieve.
+
         Returns:
-            np.ndarray: A slice of the value array.
+        SingleShot: A new SingleShot instance with the sliced data.
+
+        Example:
+        >>> data = np.array([1+1j, 2+2j, 3+3j, 4+4j, 5+5j, 6+6j])
+        >>> state_regs = {0: '0', 1: '1'}
+        >>> single_shot = SingleShot(data, state_regs)
+        >>> sliced_shot = single_shot[:, :3]
+        >>> print(sliced_shot)
+        SingleShot(value=[ 1.+1.j 2.+2.j 3.+3.j], state_regs='{0: '0', 1: '1'}')
         """
         regs_items = list(self.state_regs.items())
         if isinstance(index, tuple):
@@ -75,27 +117,82 @@ class SingleShot:
 
     @property
     def is_demodulated(self) -> bool:
-        """bool: Indicates whether the SingleShot instance has been demodulated."""
+        """Indicates whether the SingleShot instance has been demodulated.
+
+        Returns:
+        bool: True if the data has been demodulated, False otherwise.
+
+        Example:
+        >>> data = np.array([1+1j, 2+2j, 3+3j])
+        >>> state_regs = {0: '0', 1: '1'}
+        >>> single_shot = SingleShot(data, state_regs)
+        >>> print(single_shot.is_demodulated)
+        False
+        """
         return self._is_demodulated
 
     @property
     def q_registers(self) -> str:
-        # TODO: add docstring
+        """Get the qubit register string.
+
+        Returns:
+        str: A string representation of the qubit registers.
+
+        Example:
+        >>> data = np.array([1+1j, 2+2j, 3+3j])
+        >>> state_regs = {0: '0', 1: '1'}
+        >>> single_shot = SingleShot(data, state_regs)
+        >>> print(single_shot.q_registers)
+        '01'
+        """
         return "".join([str(q) for q in self.state_regs.keys()])
 
     @property
     def state(self) -> str:
-        # TODO: add docstring
+        """Get the state string.
+
+        Returns:
+        str: A string representation of the qubit states.
+
+        Example:
+        >>> data = np.array([1+1j, 2+2j, 3+3j])
+        >>> state_regs = {0: '0', 1: '1'}
+        >>> single_shot = SingleShot(data, state_regs)
+        >>> print(single_shot.state)
+        '01'
+        """
         return "".join(self.state_regs.values())
 
     @property
     def state_regs(self):
-        # TODO: add docstring
+        """Get the state registers dictionary.
+
+        Returns:
+        Dict[int, str]: A dictionary mapping qubit numbers to states.
+
+        Example:
+        >>> data = np.array([1+1j, 2+2j, 3+3j])
+        >>> state_regs = {0: '0', 1: '1'}
+        >>> single_shot = SingleShot(data, state_regs)
+        >>> print(single_shot.state_regs)
+        {0: '0', 1: '1'}
+        """
         return self._state_regs
 
     @property
     def shape(self) -> tuple:
-        """tuple: Shape of the value array."""
+        """Get the shape of the value array.
+
+        Returns:
+        tuple: Shape of the value array.
+
+        Example:
+        >>> data = np.array([1+1j, 2+2j, 3+3j, 4+4j, 5+5j, 6+6j])
+        >>> state_regs = {0: '0', 1: '1'}
+        >>> single_shot = SingleShot(data, state_regs)
+        >>> print(single_shot.shape)
+        (1, 6)
+        """
         return self.value.shape
 
     def scatter(self, ax=None, **kwargs):
