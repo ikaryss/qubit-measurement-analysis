@@ -227,9 +227,12 @@ class SingleShot:
         # https://stackoverflow.com/questions/61147532/mean-filter-in-python-without-loops
         p = self.shape[-1]
         diag_offset = np.linspace(-(k // 2), k // 2, k, dtype=int)
-        eL = scipy.sparse.diags(np.ones((k, p)), offsets=diag_offset, shape=(p, p))
-        nrmlize = np.ones_like(self.value) @ eL
-        return ((self.value @ eL) / nrmlize).astype(np.complex64)
+        sparse_matrix = scipy.sparse.diags(
+            np.ones((k, p)), offsets=diag_offset, shape=(p, p)
+        )
+        nrmlize = np.ones_like(self.value) @ sparse_matrix
+        new_value = ((self.value @ sparse_matrix) / nrmlize).astype(np.complex64)
+        return SingleShot(new_value, self.state_regs)
 
     def mean_centring(self) -> "SingleShot":
         """Center the SingleShot values by subtracting the mean.
