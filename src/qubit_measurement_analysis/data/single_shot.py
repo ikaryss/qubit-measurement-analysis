@@ -213,18 +213,57 @@ class SingleShot:
         return self._plotter.plot(ax, x, **kwargs)
 
     def mean(self, axis: int = -1) -> "SingleShot":
-        """Calculate the mean of the SingleShot values.
+        """Calculate the mean of the SingleShot values along the specified axis.
+
+        This method computes the mean of the complex-valued data in the SingleShot
+        instance. The mean is calculated element-wise for real and imaginary parts.
+
+        Args:
+            axis (int, optional): The axis along which to compute the mean.
+                Defaults to -1 (last axis).
 
         Returns:
-
             SingleShot: A new SingleShot instance containing the mean values.
+
+        Example:
+            >>> import numpy as np
+            >>> data = np.array([[1+1j, 2+2j, 3+3j], [4+4j, 5+5j, 6+6j]])
+            >>> state_regs = {0: '0', 1: '1'}
+            >>> single_shot = SingleShot(data, state_regs)
+            >>> mean_shot = single_shot.mean()
+            >>> print(mean_shot)
+            SingleShot(value=[[2.5+2.5j 3.5+3.5j 4.5+4.5j]], state_regs='{0: '0', 1: '1'}')
         """
         mean_value = self.value.mean(axis, keepdims=True)
         return SingleShot(mean_value, self.state_regs)
 
     def mean_filter(self, k):
-        # TODO: add docstring
-        # https://stackoverflow.com/questions/61147532/mean-filter-in-python-without-loops
+        """Apply a mean filter to the SingleShot values.
+
+        This method applies a mean filter (moving average) to the complex-valued
+        data in the SingleShot instance. The filter is applied along the last axis
+        of the data.
+
+        Args:
+            k (int): The size of the filter window. Must be an odd positive integer.
+
+        Returns:
+            SingleShot: A new SingleShot instance containing the filtered values.
+
+        Raises:
+            ValueError: If k is not positive integer.
+
+        Example:
+            >>> import numpy as np
+            >>> data = np.array([1+1j, 2+2j, 3+3j, 4+4j, 5+5j])
+            >>> state_regs = {0: '0', 1: '1'}
+            >>> single_shot = SingleShot(data, state_regs)
+            >>> filtered_shot = single_shot.mean_filter(3)
+            >>> print(filtered_shot)
+            SingleShot(value=[[1.5+1.5j 2. +2.j  3. +3.j  4. +4.j  4.5+4.5j]], state_regs='{0: '0', 1: '1'}')
+        """
+        if k <= 0:
+            raise ValueError("k must be positive integer")
         p = self.shape[-1]
         diag_offset = np.linspace(-(k // 2), k // 2, k, dtype=int)
         sparse_matrix = scipy.sparse.diags(
