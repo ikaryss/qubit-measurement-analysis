@@ -177,7 +177,7 @@ class SingleShot:
         >>> print(single_shot.state_regs)
         {0: '0', 1: '1'}
         """
-        return self._state_regs
+        return self._state_regs.copy()
 
     @property
     def shape(self) -> tuple:
