@@ -39,6 +39,8 @@ class SingleShot:
     SingleShot(value=[ 1.+1.j 2.+2.j 3.+3.j], state_regs='{0: '0', 1: '1'}')
     """
 
+    __last_is_demodulated = None
+
     def __init__(self, value: np.ndarray, state_regs: Dict[int, str]) -> None:
         """Initialize a SingleShot instance.
 
@@ -58,7 +60,11 @@ class SingleShot:
             raise TypeError(
                 "value must be a numpy array of complex or float (int) elements"
             )
-        if value.ndim > 1 and np.issubdtype(value.dtype, np.complexfloating):
+        if (
+            value.ndim > 1
+            and np.issubdtype(value.dtype, np.complexfloating)
+            and SingleShot.__last_is_demodulated is None
+        ):
             raise ValueError("value of complex dtype must be 1 dimensional")
         if not np.issubdtype(value.dtype, np.complexfloating):
             value = self._from_real(value)
@@ -68,8 +74,11 @@ class SingleShot:
         self.value = value if value.ndim > 1 else value.reshape(1, -1)
         self._state_regs = state_regs
 
-        self._is_demodulated: bool = self.value.shape[0] > 1
-        # TODO: fix is_demodulated when ss.demodulate(freqs, meas_time, "clockwise")[0, 500:1500].is_demodulated
+        if SingleShot.__last_is_demodulated is not None:
+            self._is_demodulated = SingleShot.__last_is_demodulated
+        else:
+            self._is_demodulated: bool = False
+
         self.id = str(uuid.uuid4())  # Generate a unique ID for the SingleShot instance
         self._plotter = ssp(children=self)
 
@@ -312,7 +321,7 @@ class SingleShot:
         value_new = self._exponential_rotation(
             value_new, intermediate_freqs, meas_time_new, direction
         )
-        # TODO: Add change of global value
+        SingleShot.__last_is_demodulated = True
         return SingleShot(value_new, self.state_regs)
 
     @staticmethod
