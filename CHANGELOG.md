@@ -1,3 +1,9 @@
+## 0.4.1 (2024-07-23)
+
+### Fix
+
+- fix a github workflow actions bug
+
 ## 0.4.0 (2024-07-23)
 
 ### Feat
