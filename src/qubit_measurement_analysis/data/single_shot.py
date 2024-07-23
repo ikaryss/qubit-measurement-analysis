@@ -36,6 +36,7 @@ class SingleShot:
         self._state_regs = state_regs
 
         self._is_demodulated: bool = self.value.shape[0] > 1
+        # TODO: fix is_demodulated when ss.demodulate(freqs, meas_time, "clockwise")[0, 500:1500].is_demodulated
         self.id = str(uuid.uuid4())  # Generate a unique ID for the SingleShot instance
         self._plotter = ssp(children=self)
 
@@ -206,6 +207,7 @@ class SingleShot:
         value_new = self._exponential_rotation(
             value_new, intermediate_freqs, meas_time_new, direction
         )
+        # TODO: Add change of global value
         return SingleShot(value_new, self.state_regs)
 
     @staticmethod

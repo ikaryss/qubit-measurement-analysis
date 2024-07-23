@@ -1,3 +1,20 @@
+## 0.4.0 (2024-07-23)
+
+### Feat
+
+- extend visualization functionality by allowing the use of built-in matplotlib arguments in the .plt and .scatter functions
+
+### Fix
+
+- **SingleShotPlotter**: correct a typo in SingleShotPlotter class naming
+- **SingleShot**: hot fix of previous commit
+- **SingleShot**: fix a bug when creating SingleShot instance with array of complex but not `np.complex64` values
+
+### Refactor
+
+- **src/qubit_measurement_analysis/visualization/**: refractor code, reduce unnecessary dependencies
+- **.gitignore**: add .vscode to .gitignore
+
 ## 0.3.0 (2024-07-09)
 
 ### Feat
