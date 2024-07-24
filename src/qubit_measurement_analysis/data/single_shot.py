@@ -29,7 +29,7 @@ class SingleShot:
     This is implemented as a subclass of a standard numpy array
     """
 
-    __last_is_demodulated = None
+    _is_demodulated: bool = False
 
     def __init__(self, value: ArrayLike, state_regs: Dict[int, str]) -> None:
         """Initialize a SingleShot instance.
@@ -50,7 +50,7 @@ class SingleShot:
             raise TypeError("value must be an iterable of complex elements")
         if not np.issubdtype(value.dtype, np.complexfloating):
             raise ValueError("value must be of `np.complexfloating` dtype")
-        if value.ndim > 1 and SingleShot.__last_is_demodulated is None:
+        if value.ndim > 1 and self._is_demodulated is None:
             raise ValueError("value of complex dtype must be 1 dimensional")
 
         if value.dtype != DEFAULT_DTYPE:
@@ -58,11 +58,6 @@ class SingleShot:
 
         self.value = value if value.ndim > 1 else value.reshape(1, -1)
         self._state_regs = state_regs
-
-        if SingleShot.__last_is_demodulated is not None:
-            self._is_demodulated = SingleShot.__last_is_demodulated
-        else:
-            self._is_demodulated: bool = False
 
         self.id = str(uuid.uuid4())  # Generate a unique ID for the SingleShot instance
         self._plotter = ssp(children=self)
@@ -96,9 +91,11 @@ class SingleShot:
                 [regs_items[index]] if isinstance(index, int) else regs_items[index]
             )
 
-        return SingleShot(
+        new_instance = SingleShot(
             self.value[index], {item[0]: item[1] for item in new_reg_items}
         )
+        new_instance._is_demodulated = self._is_demodulated
+        return new_instance
 
     def __repr__(self) -> str:
         """Return a string representation of the SingleShot instance.
@@ -220,7 +217,9 @@ class SingleShot:
             SingleShot(value=[[2.5+2.5j 3.5+3.5j 4.5+4.5j]], state_regs='{0: '0', 1: '1'}')
         """
         mean_value = self.value.mean(axis, keepdims=True)
-        return SingleShot(mean_value, self.state_regs)
+        new_instance = SingleShot(mean_value, self.state_regs)
+        new_instance._is_demodulated = self._is_demodulated
+        return new_instance
 
     def mean_filter(self, k):
         """Apply a mean filter to the SingleShot values.
@@ -256,7 +255,10 @@ class SingleShot:
         )
         nrmlize = np.ones_like(self.value) @ sparse_matrix
         new_value = ((self.value @ sparse_matrix) / nrmlize).astype(DEFAULT_DTYPE)
-        return SingleShot(new_value, self.state_regs)
+
+        new_instance = SingleShot(new_value, self.state_regs)
+        new_instance._is_demodulated = self._is_demodulated
+        return new_instance
 
     def mean_centring(self) -> "SingleShot":
         """Center the SingleShot values by subtracting the mean.
@@ -273,7 +275,9 @@ class SingleShot:
         SingleShot(value=[-1.-1.j 0.+0.j 1.+1.j], state_regs='{0: '0', 1: '1'}')
         """
         centered_value = self.value - self.mean().value
-        return SingleShot(centered_value, self.state_regs)
+        new_instance = SingleShot(centered_value, self.state_regs)
+        new_instance._is_demodulated = self._is_demodulated
+        return new_instance
 
     # TODO: rewrite w.r.t complex values
     def normalize(self) -> "SingleShot":
@@ -283,7 +287,10 @@ class SingleShot:
             SingleShot: A new SingleShot instance with normalized values.
         """
         norm_value = self.value / np.linalg.norm(self.value, axis=-1)
-        return SingleShot(norm_value, self.state_regs)
+
+        new_instance = SingleShot(norm_value, self.state_regs)
+        new_instance._is_demodulated = self._is_demodulated
+        return new_instance
 
     # TODO: rewrite w.r.t complex values
     def standardize(self) -> "SingleShot":
@@ -293,7 +300,10 @@ class SingleShot:
             SingleShot: A new SingleShot instance with standardized values.
         """
         standardized_value = (self.value - self.value.mean()) / self.value.std(-1)
-        return SingleShot(standardized_value, self.state_regs)
+
+        new_instance = SingleShot(standardized_value, self.state_regs)
+        new_instance._is_demodulated = self._is_demodulated
+        return new_instance
 
     def get_fft_amps_freqs(self, sampling_rate):
         # TODO: add docstring
@@ -348,8 +358,9 @@ class SingleShot:
         value_new = self._exponential_rotation(
             value_new, intermediate_freqs, meas_time_new, direction
         )
-        SingleShot.__last_is_demodulated = True
-        return SingleShot(value_new, self.state_regs)
+        new_instance = SingleShot(value_new, self.state_regs)
+        new_instance._is_demodulated = True
+        return new_instance
 
     @staticmethod
     def _exponential_rotation(value, freqs, times, direction) -> np.ndarray:
