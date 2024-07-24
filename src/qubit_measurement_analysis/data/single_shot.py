@@ -35,11 +35,11 @@ class SingleShot:
         """Initialize a SingleShot instance.
 
         Args:
-        value (np.ndarray): A numpy array of `np.complex64` or `float` elements.
+        value (ArrayLike): A numpy array of `np.complexfloating` elements.
         state_regs (Dict[int, str]): A dictionary mapping qubit numbers to states.
 
         Raises:
-        TypeError: If value is not a numpy array of complex or float elements.
+        TypeError: If value is not an array of complex elements.
 
         Example:
         >>> data = np.array([1+1j, 2+2j, 3+3j])
@@ -47,18 +47,12 @@ class SingleShot:
         >>> single_shot = SingleShot(data, state_regs)
         """
         if not isinstance(value, Iterable):
-            raise TypeError(
-                "value must be an iterable of complex or float (int) elements"
-            )
-
-        if (
-            value.ndim > 1
-            and np.issubdtype(value.dtype, np.complexfloating)
-            and SingleShot.__last_is_demodulated is None
-        ):
-            raise ValueError("value of complex dtype must be 1 dimensional")
+            raise TypeError("value must be an iterable of complex elements")
         if not np.issubdtype(value.dtype, np.complexfloating):
-            value = self._from_real(value)
+            raise ValueError("value must be of `np.complexfloating` dtype")
+        if value.ndim > 1 and SingleShot.__last_is_demodulated is None:
+            raise ValueError("value of complex dtype must be 1 dimensional")
+
         if value.dtype != DEFAULT_DTYPE:
             value = value.astype(DEFAULT_DTYPE)
 
@@ -381,7 +375,6 @@ class SingleShot:
         self,
         parent_dir: str,
         subfolder: str,
-        dtype: str = "complex64",
         verbose: bool = False,
     ) -> None:
         """Save the SingleShot instance to a specified directory.
@@ -390,50 +383,14 @@ class SingleShot:
             parent_dir (str): The parent directory where the data will be saved.
             qubits_dir (str): The folder indicating qubit number set of the readout signal ('q1-q2-q3 for instance').
             subfolder (str): Subfolder within the state folder ('train', 'val', or 'test').
-            dtype (str): Data type for saving ('complex64' or 'float32'). Defaults to 'complex64'.
             verbose (bool): _description_
         """
         directory = os.path.join(parent_dir, self.q_registers, self.state, subfolder)
         os.makedirs(directory, exist_ok=True)
-        save_value = self._prepare_save_value(dtype)
         file_path = os.path.join(directory, f"{self.id}.npy")
-        np.save(file_path, save_value)
+        np.save(file_path, self.value)
         if verbose:
             print(f"Saved {self.state} {subfolder} data to {file_path}")
-
-    def _prepare_save_value(self, dtype: str) -> np.ndarray:
-        """Prepare the value array for saving.
-
-        Args:
-            dtype (str): Data type for saving ('complex64' or 'float32').
-
-        Returns:
-            np.ndarray: Value array prepared for saving.
-        """
-        if dtype == "complex64":
-            return self.value
-        elif dtype == "float32":
-            return self._to_float32()
-        else:
-            raise ValueError("Unsupported dtype. Use 'complex64' or 'float32'.")
-
-    def _to_float32(self) -> np.ndarray:
-        """Convert the value array to float32 dtype.
-
-        Returns:
-            np.ndarray: Value array converted to float32 dtype.
-        """
-        if self._is_demodulated:
-            save_value = np.empty(
-                (2 * self.value.shape[0], self.value.shape[1]), dtype=np.float32
-            )
-            save_value[0::2] = self.value.real
-            save_value[1::2] = self.value.imag
-        else:
-            save_value = np.empty((2, self.value.shape[1]), dtype=np.float32)
-            save_value[0] = self.value.real
-            save_value[1] = self.value.imag
-        return save_value
 
     @classmethod
     def load(
@@ -464,15 +421,12 @@ class SingleShot:
         filename = next(x for i, x in enumerate(dir_generator) if i == index)
         _id = os.path.splitext(os.path.basename(filename))[0]
         loaded_file = np.load(filename)
-        if loaded_file.dtype == np.float32:
-            value = cls._from_real(loaded_file)
-            is_demodulated = loaded_file.shape[0] != 2
-        elif loaded_file.dtype == DEFAULT_DTYPE:
+        if loaded_file.dtype == DEFAULT_DTYPE:
             value = loaded_file
             is_demodulated = loaded_file.shape[0] > 1
         else:
             raise ValueError(
-                "Unsupported dtype in loaded file. Must be 'float32' or 'complex64'."
+                "Unsupported dtype in loaded file. Must be 'np.complex64'."
             )
         state_regs = {int(q): s for q, s in zip(qubits_dir, state)}
         loaded_instance = cls(value, state_regs)
@@ -481,22 +435,3 @@ class SingleShot:
         if verbose:
             print(f"[INFO] {filename} has been loaded.")
         return loaded_instance
-
-    @staticmethod
-    def _from_real(loaded_file: np.ndarray) -> np.ndarray:
-        """Convert a float or int array to complex64.
-
-        Args:
-            loaded_file (np.ndarray): Input array of dtype float.
-
-        Returns:
-            np.ndarray: Complex64 array.
-        """
-        if loaded_file.shape[0] % 2 != 0:
-            raise ValueError(
-                "Invalid shape for float data. Must have even first dimension."
-            )
-        real_part = loaded_file[0::2]
-        imag_part = loaded_file[1::2]
-        value = real_part + 1j * imag_part
-        return value.astype(DEFAULT_DTYPE)

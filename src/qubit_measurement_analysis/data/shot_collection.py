@@ -183,7 +183,6 @@ class ShotCollection:
         val_ratio: float,
         test_ratio: float,
         clear_existing: bool = False,
-        dtype: str = "complex64",
         verbose: bool = False,
     ) -> None:
         """Save the ShotCollection to the specified directory with train, val, test splits
@@ -195,7 +194,6 @@ class ShotCollection:
             val_ratio (float): _description_
             test_ratio (float): _description_
             clear_existing (bool, optional): _description_. Defaults to False.
-            dtype (str): Data type for saving ('complex64' or 'float32'). Defaults to 'complex64'.
             verbose (bool): _description_
         """
         if not (0 <= train_ratio <= 1 and 0 <= val_ratio <= 1 and 0 <= test_ratio <= 1):
@@ -221,7 +219,7 @@ class ShotCollection:
                 subfolder = "val"
             else:
                 subfolder = "test"
-            shot.save(parent_dir, qubits_dir, subfolder, dtype, verbose)
+            shot.save(parent_dir, qubits_dir, subfolder, verbose)
 
     @classmethod
     def load(
