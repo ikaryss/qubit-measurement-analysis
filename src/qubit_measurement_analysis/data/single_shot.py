@@ -7,14 +7,17 @@ measurement data in quantum experiments.
 import os
 import uuid
 import glob
-from typing import Dict
+from typing import Dict, Iterable
 
 import numpy as np
+from numpy.typing import ArrayLike
 import scipy.sparse
 
 from qubit_measurement_analysis.visualization.single_shot_plotter import (
     SingleShotPlotter as ssp,
 )
+
+DEFAULT_DTYPE: type = np.complex64
 
 
 class SingleShot:
@@ -23,25 +26,12 @@ class SingleShot:
     This class represents a single-shot measurement in quantum experiments,
     providing methods for data manipulation, analysis, and visualization.
 
-    Attributes:
-    value (np.ndarray): The measurement data.
-    id (str): A unique identifier for the SingleShot instance.
-    _state_regs (Dict[int, str]): A dictionary mapping qubit numbers to states.
-    _is_demodulated (bool): Indicates whether the data has been demodulated.
-    _plotter (SingleShotPlotter): A plotter object for visualization.
-
-    Example:
-    >>> import numpy as np
-    >>> data = np.array([1+1j, 2+2j, 3+3j])
-    >>> state_regs = {0: '0', 1: '1'}
-    >>> single_shot = SingleShot(data, state_regs)
-    >>> print(single_shot)
-    SingleShot(value=[ 1.+1.j 2.+2.j 3.+3.j], state_regs='{0: '0', 1: '1'}')
+    This is implemented as a subclass of a standard numpy array
     """
 
     __last_is_demodulated = None
 
-    def __init__(self, value: np.ndarray, state_regs: Dict[int, str]) -> None:
+    def __init__(self, value: ArrayLike, state_regs: Dict[int, str]) -> None:
         """Initialize a SingleShot instance.
 
         Args:
@@ -56,10 +46,11 @@ class SingleShot:
         >>> state_regs = {0: '0', 1: '1'}
         >>> single_shot = SingleShot(data, state_regs)
         """
-        if not isinstance(value, np.ndarray):
+        if not isinstance(value, Iterable):
             raise TypeError(
-                "value must be a numpy array of complex or float (int) elements"
+                "value must be an iterable of complex or float (int) elements"
             )
+
         if (
             value.ndim > 1
             and np.issubdtype(value.dtype, np.complexfloating)
@@ -68,8 +59,8 @@ class SingleShot:
             raise ValueError("value of complex dtype must be 1 dimensional")
         if not np.issubdtype(value.dtype, np.complexfloating):
             value = self._from_real(value)
-        if value.dtype != np.complex64:
-            value = value.astype(np.complex64)
+        if value.dtype != DEFAULT_DTYPE:
+            value = value.astype(DEFAULT_DTYPE)
 
         self.value = value if value.ndim > 1 else value.reshape(1, -1)
         self._state_regs = state_regs
@@ -270,7 +261,7 @@ class SingleShot:
             np.ones((k, p)), offsets=diag_offset, shape=(p, p)
         )
         nrmlize = np.ones_like(self.value) @ sparse_matrix
-        new_value = ((self.value @ sparse_matrix) / nrmlize).astype(np.complex64)
+        new_value = ((self.value @ sparse_matrix) / nrmlize).astype(DEFAULT_DTYPE)
         return SingleShot(new_value, self.state_regs)
 
     def mean_centring(self) -> "SingleShot":
@@ -384,7 +375,7 @@ class SingleShot:
         rotation = (
             np.exp(-1j * phase) if direction == "clockwise" else np.exp(1j * phase)
         )
-        return (value * rotation).astype(np.complex64)
+        return (value * rotation).astype(DEFAULT_DTYPE)
 
     def save(
         self,
@@ -476,7 +467,7 @@ class SingleShot:
         if loaded_file.dtype == np.float32:
             value = cls._from_real(loaded_file)
             is_demodulated = loaded_file.shape[0] != 2
-        elif loaded_file.dtype == np.complex64:
+        elif loaded_file.dtype == DEFAULT_DTYPE:
             value = loaded_file
             is_demodulated = loaded_file.shape[0] > 1
         else:
@@ -508,4 +499,4 @@ class SingleShot:
         real_part = loaded_file[0::2]
         imag_part = loaded_file[1::2]
         value = real_part + 1j * imag_part
-        return value.astype(np.complex64)
+        return value.astype(DEFAULT_DTYPE)
