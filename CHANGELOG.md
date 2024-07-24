@@ -1,3 +1,21 @@
+## 0.5.0 (2024-07-24)
+
+### Feat
+
+- remove auto real -> complex conversion when instantiating SingleShot object, remove optional complex -> real conversion when saving a SingleShot instance
+
+### Fix
+
+- **src/qubit_measurement_analysis/data/single_shot.py**: fix a self.is_demodulated setter after initialization
+- **src/qubit_measurement_analysis/data/single_shot.py**: return new SingleShot instance after mean_filter function
+- **src/qubit_measurement_analysis/data/single_shot.py**: fix a bug when self.is_demodulated flag had not been remembered by class after data manupulation
+- **src/qubit_measurement_analysis/data/single_shot.py**: make state_regs property read-only
+
+### Refactor
+
+- **src/qubit_measurement_analysis/data/single_shot.py**: change the `self._is_demodulated` initialization
+- add minor code changes, prepare package for GPU support
+
 ## 0.4.1 (2024-07-23)
 
 ### Fix
