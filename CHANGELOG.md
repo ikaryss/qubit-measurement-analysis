@@ -1,3 +1,9 @@
+## 0.5.1 (2024-07-26)
+
+### Fix
+
+- **src/qubit_measurement_analysis/data/single_shot.py**: fix normalize and standardize functions
+
 ## 0.5.0 (2024-07-24)
 
 ### Feat
