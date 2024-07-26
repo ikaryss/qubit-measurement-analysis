@@ -279,26 +279,26 @@ class SingleShot:
         new_instance = SingleShot(centered_value, self.state_regs, self._is_demodulated)
         return new_instance
 
-    # TODO: rewrite w.r.t complex values
     def normalize(self) -> "SingleShot":
-        """Normalize the SingleShot values to have unit norm.
-
-        Returns:
-            SingleShot: A new SingleShot instance with normalized values.
-        """
-        norm_value = self.value / np.linalg.norm(self.value, axis=-1)
+        # TODO: Add docstring
+        norm_value = (self.value - self.value.min()) / (
+            self.value.max() - self.value.min()
+        )
 
         new_instance = SingleShot(norm_value, self.state_regs, self._is_demodulated)
         return new_instance
 
-    # TODO: rewrite w.r.t complex values
     def standardize(self) -> "SingleShot":
         """Standardize the SingleShot values by subtracting mean and dividing by standard deviation.
 
         Returns:
             SingleShot: A new SingleShot instance with standardized values.
         """
-        standardized_value = (self.value - self.value.mean()) / self.value.std(-1)
+        std_real = self.value.real.std(-1)
+        std_imag = self.value.imag.std(-1)
+        standardized_value = (self.value - self.value.mean()) / (
+            std_real + std_imag * 1j
+        )
 
         new_instance = SingleShot(
             standardized_value, self.state_regs, self._is_demodulated
