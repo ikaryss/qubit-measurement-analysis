@@ -32,20 +32,7 @@ class SingleShot:
     def __init__(
         self, value: ArrayLike, state_regs: Dict[int, str], _is_demodulated: bool = None
     ) -> None:
-        """Initialize a SingleShot instance.
-
-        Args:
-        value (ArrayLike): A numpy array of `np.complexfloating` elements.
-        state_regs (Dict[int, str]): A dictionary mapping qubit numbers to states.
-
-        Raises:
-        TypeError: If value is not an array of complex elements.
-
-        Example:
-        >>> data = np.array([1+1j, 2+2j, 3+3j])
-        >>> state_regs = {0: '0', 1: '1'}
-        >>> single_shot = SingleShot(data, state_regs)
-        """
+        """Initialize a SingleShot instance."""
         self._is_demodulated = False if _is_demodulated is None else _is_demodulated
 
         if not isinstance(value, Iterable):
@@ -72,14 +59,6 @@ class SingleShot:
 
         Returns:
         SingleShot: A new SingleShot instance with the sliced data.
-
-        Example:
-        >>> data = np.array([1+1j, 2+2j, 3+3j, 4+4j, 5+5j, 6+6j])
-        >>> state_regs = {0: '0', 1: '1'}
-        >>> single_shot = SingleShot(data, state_regs)
-        >>> sliced_shot = single_shot[:, :3]
-        >>> print(sliced_shot)
-        SingleShot(value=[ 1.+1.j 2.+2.j 3.+3.j], state_regs='{0: '0', 1: '1'}')
         """
         regs_items = list(self.state_regs.items())
         if isinstance(index, tuple):
@@ -115,13 +94,6 @@ class SingleShot:
 
         Returns:
         bool: True if the data has been demodulated, False otherwise.
-
-        Example:
-        >>> data = np.array([1+1j, 2+2j, 3+3j])
-        >>> state_regs = {0: '0', 1: '1'}
-        >>> single_shot = SingleShot(data, state_regs)
-        >>> print(single_shot.is_demodulated)
-        False
         """
         return self._is_demodulated
 
@@ -131,13 +103,6 @@ class SingleShot:
 
         Returns:
         str: A string representation of the qubit registers.
-
-        Example:
-        >>> data = np.array([1+1j, 2+2j, 3+3j])
-        >>> state_regs = {0: '0', 1: '1'}
-        >>> single_shot = SingleShot(data, state_regs)
-        >>> print(single_shot.q_registers)
-        '01'
         """
         return "".join([str(q) for q in self.state_regs.keys()])
 
@@ -147,13 +112,6 @@ class SingleShot:
 
         Returns:
         str: A string representation of the qubit states.
-
-        Example:
-        >>> data = np.array([1+1j, 2+2j, 3+3j])
-        >>> state_regs = {0: '0', 1: '1'}
-        >>> single_shot = SingleShot(data, state_regs)
-        >>> print(single_shot.state)
-        '01'
         """
         return "".join(self.state_regs.values())
 
@@ -163,13 +121,6 @@ class SingleShot:
 
         Returns:
         Dict[int, str]: A dictionary mapping qubit numbers to states.
-
-        Example:
-        >>> data = np.array([1+1j, 2+2j, 3+3j])
-        >>> state_regs = {0: '0', 1: '1'}
-        >>> single_shot = SingleShot(data, state_regs)
-        >>> print(single_shot.state_regs)
-        {0: '0', 1: '1'}
         """
         return self._state_regs.copy()
 
@@ -179,13 +130,6 @@ class SingleShot:
 
         Returns:
         tuple: Shape of the value array.
-
-        Example:
-        >>> data = np.array([1+1j, 2+2j, 3+3j, 4+4j, 5+5j, 6+6j])
-        >>> state_regs = {0: '0', 1: '1'}
-        >>> single_shot = SingleShot(data, state_regs)
-        >>> print(single_shot.shape)
-        (1, 6)
         """
         return self.value.shape
 
@@ -256,7 +200,7 @@ class SingleShot:
             np.ones((k, p)), offsets=diag_offset, shape=(p, p)
         )
         nrmlize = np.ones_like(self.value) @ sparse_matrix
-        new_value = ((self.value @ sparse_matrix) / nrmlize).astype(DEFAULT_DTYPE)
+        new_value = (self.value @ sparse_matrix) / nrmlize
 
         new_instance = SingleShot(new_value, self.state_regs, self._is_demodulated)
         return new_instance
@@ -305,14 +249,6 @@ class SingleShot:
         )
         return new_instance
 
-    def get_fft_amps_freqs(self, sampling_rate):
-        # TODO: add docstring
-        _, signal_length = self.shape
-        freqs = np.fft.fftfreq(signal_length, d=1.0 / sampling_rate)
-        fft_results = np.fft.fft(self.value, axis=1)
-        amplitudes = np.abs(fft_results) / signal_length
-        return amplitudes, freqs
-
     def demodulate(
         self,
         intermediate_freq: Dict[int, float],
@@ -339,9 +275,10 @@ class SingleShot:
                 "Cannot demodulate SingleShot which is already demodulated"
             )
         if not set(intermediate_freq.keys()).issubset(self.state_regs.keys()):
-            # TODO: add value error description that keys from `intermediate_freq` and `self.state_regs`
-            # must not to be differ
-            raise ValueError("_description_")
+            raise ValueError(
+                f"`intermediate_freq.keys()` must be a subset of `self.state_regs.keys()`, \
+                    but got {intermediate_freq.keys()} and {self.state_regs.keys()}"
+            )
 
         if not isinstance(meas_time, np.ndarray) or meas_time.ndim != 1:
             raise TypeError("meas_time must be a 1D numpy array")
@@ -363,7 +300,6 @@ class SingleShot:
 
     @staticmethod
     def _exponential_rotation(value, freqs, times, direction) -> np.ndarray:
-        # TODO: elaborate on docstring
         """Apply exponential rotation to the value array.
 
         Args:
@@ -379,7 +315,15 @@ class SingleShot:
         rotation = (
             np.exp(-1j * phase) if direction == "clockwise" else np.exp(1j * phase)
         )
-        return (value * rotation).astype(DEFAULT_DTYPE)
+        return value * rotation
+
+    def get_fft_amps_freqs(self, sampling_rate):
+        # TODO: add docstring
+        _, signal_length = self.shape
+        freqs = np.fft.fftfreq(signal_length, d=1.0 / sampling_rate)
+        fft_results = np.fft.fft(self.value, axis=1)
+        amplitudes = np.abs(fft_results) / signal_length
+        return amplitudes, freqs
 
     def save(
         self,
