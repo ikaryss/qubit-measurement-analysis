@@ -7,15 +7,15 @@ measurement data in quantum experiments.
 import os
 import uuid
 import glob
-from typing import Dict, Iterable
+from typing import Dict
 
 import numpy as np
 from numpy.typing import ArrayLike
-import scipy.sparse
 
 from qubit_measurement_analysis.visualization.single_shot_plotter import (
     SingleShotPlotter as ssp,
 )
+from qubit_measurement_analysis import ArrayModule
 
 DEFAULT_DTYPE: type = np.complex64
 
@@ -30,13 +30,19 @@ class SingleShot:
     """
 
     def __init__(
-        self, value: ArrayLike, state_regs: Dict[int, str], _is_demodulated: bool = None
+        self,
+        value: ArrayLike,
+        state_regs: Dict[int, str],
+        _is_demodulated: bool = None,
+        device: str = "cpu",
     ) -> None:
         """Initialize a SingleShot instance."""
         self._is_demodulated = False if _is_demodulated is None else _is_demodulated
 
-        if not isinstance(value, Iterable):
-            raise TypeError("value must be an iterable of complex elements")
+        self.xp = ArrayModule(device)
+        if not isinstance(value, self.xp.ndarray):
+            value = self.xp.asarray(value)
+
         if not np.issubdtype(value.dtype, np.complexfloating):
             raise TypeError("value must be of `np.complexfloating` dtype")
         if value.ndim > 1 and value.shape[0] > 1 and self._is_demodulated is False:
@@ -76,6 +82,7 @@ class SingleShot:
             self.value[index],
             {item[0]: item[1] for item in new_reg_items},
             self._is_demodulated,
+            self.device,
         )
         return new_instance
 
@@ -86,7 +93,7 @@ class SingleShot:
 
             str: String representation of the SingleShot instance.
         """
-        return f"SingleShot(value={np.array2string(self.value, threshold=5)}, state_regs='{self.state_regs}')"
+        return f"SingleShot(value={self.value}, state_regs='{self.state_regs}')"
 
     @property
     def is_demodulated(self) -> bool:
@@ -133,6 +140,10 @@ class SingleShot:
         """
         return self.value.shape
 
+    @property
+    def device(self):
+        return self.xp.device
+
     def scatter(self, ax=None, **kwargs):
         # TODO: add docstring
         return self._plotter.scatter(ax, **kwargs)
@@ -164,7 +175,9 @@ class SingleShot:
             SingleShot(value=[[2.5+2.5j 3.5+3.5j 4.5+4.5j]], state_regs='{0: '0', 1: '1'}')
         """
         mean_value = self.value.mean(axis, keepdims=True)
-        new_instance = SingleShot(mean_value, self.state_regs, self._is_demodulated)
+        new_instance = SingleShot(
+            mean_value, self.state_regs, self._is_demodulated, self.device
+        )
         return new_instance
 
     def mean_filter(self, k):
@@ -195,14 +208,16 @@ class SingleShot:
         if k <= 0:
             raise ValueError("k must be positive integer")
         p = self.shape[-1]
-        diag_offset = np.linspace(-(k // 2), k // 2, k, dtype=int)
-        sparse_matrix = scipy.sparse.diags(
-            np.ones((k, p)), offsets=diag_offset, shape=(p, p)
+        diag_offset = self.xp.linspace(-(k // 2), k // 2, k, dtype=int)
+        sparse_matrix = self.xp.scipy.sparse.diags(
+            self.xp.ones((k, p)), offsets=diag_offset, shape=(p, p)
         )
-        nrmlize = np.ones_like(self.value) @ sparse_matrix
+        nrmlize = self.xp.ones_like(self.value) @ sparse_matrix
         new_value = (self.value @ sparse_matrix) / nrmlize
 
-        new_instance = SingleShot(new_value, self.state_regs, self._is_demodulated)
+        new_instance = SingleShot(
+            new_value, self.state_regs, self._is_demodulated, self.device
+        )
         return new_instance
 
     def mean_centring(self) -> "SingleShot":
@@ -220,7 +235,9 @@ class SingleShot:
         SingleShot(value=[-1.-1.j 0.+0.j 1.+1.j], state_regs='{0: '0', 1: '1'}')
         """
         centered_value = self.value - self.mean().value
-        new_instance = SingleShot(centered_value, self.state_regs, self._is_demodulated)
+        new_instance = SingleShot(
+            centered_value, self.state_regs, self._is_demodulated, self.device
+        )
         return new_instance
 
     def normalize(self) -> "SingleShot":
@@ -229,7 +246,9 @@ class SingleShot:
             self.value.max() - self.value.min()
         )
 
-        new_instance = SingleShot(norm_value, self.state_regs, self._is_demodulated)
+        new_instance = SingleShot(
+            norm_value, self.state_regs, self._is_demodulated, self.device
+        )
         return new_instance
 
     def standardize(self) -> "SingleShot":
@@ -245,14 +264,14 @@ class SingleShot:
         )
 
         new_instance = SingleShot(
-            standardized_value, self.state_regs, self._is_demodulated
+            standardized_value, self.state_regs, self._is_demodulated, self.device
         )
         return new_instance
 
     def demodulate(
         self,
         intermediate_freq: Dict[int, float],
-        meas_time: np.ndarray,
+        meas_time: ArrayLike,
         direction: str = "clockwise",
     ) -> "SingleShot":
         # TODO: elaborate on docstring
@@ -260,7 +279,7 @@ class SingleShot:
 
         Args:
             intermediate_freq (dict): Dictionary containing a qubit number as a key and an intermediate frequency of resonator as a value.
-            meas_time (np.ndarray): Signal measurement time.
+            meas_time (ArrayLike): Signal measurement time.
             direction (str): 'clockwise' for clockwise rotation, otherwise - else.
 
         Raises:
@@ -280,8 +299,10 @@ class SingleShot:
                     but got {intermediate_freq.keys()} and {self.state_regs.keys()}"
             )
 
-        if not isinstance(meas_time, np.ndarray) or meas_time.ndim != 1:
-            raise TypeError("meas_time must be a 1D numpy array")
+        if not isinstance(meas_time, self.xp.ndarray):
+            meas_time = self.xp.asarray(meas_time)
+        if meas_time.ndim != 1:
+            raise TypeError("meas_time must be a 1D array")
 
         if not self.shape[-1] == meas_time.shape[-1]:
             raise ValueError(
@@ -289,40 +310,33 @@ class SingleShot:
             )
 
         num_freqs = len(intermediate_freq)
-        value_new = np.tile(self.value, (num_freqs, 1))
-        meas_time_new = np.tile(meas_time, (num_freqs, 1))
-        intermediate_freqs = np.array(list(intermediate_freq.values())).reshape(-1, 1)
+        value_new = self.xp.tile(self.value, (num_freqs, 1))
+        meas_time_new = self.xp.tile(meas_time, (num_freqs, 1))
+        intermediate_freqs = self.xp.array(list(intermediate_freq.values())).reshape(
+            -1, 1
+        )
         value_new = self._exponential_rotation(
             value_new, intermediate_freqs, meas_time_new, direction
         )
-        new_instance = SingleShot(value_new, self.state_regs, True)
+        new_instance = SingleShot(value_new, self.state_regs, True, self.device)
         return new_instance
 
-    @staticmethod
-    def _exponential_rotation(value, freqs, times, direction) -> np.ndarray:
-        """Apply exponential rotation to the value array.
-
-        Args:
-            value (np.ndarray): Input array.
-            freqs (np.ndarray): Array of intermediate frequencies.
-            times (np.ndarray): Array of measurement times.
-            direction (str): 'clockwise' for clockwise rotation, otherwise - else.
-
-        Returns:
-            np.ndarray: Array after applying exponential rotation.
-        """
-        phase = 2 * np.pi * freqs * times
+    def _exponential_rotation(self, value, freqs, times, direction):
+        """Apply exponential rotation to the value array."""
+        phase = 2 * self.xp.pi * freqs * times
         rotation = (
-            np.exp(-1j * phase) if direction == "clockwise" else np.exp(1j * phase)
+            self.xp.exp(-1j * phase)
+            if direction == "clockwise"
+            else self.xp.exp(1j * phase)
         )
         return value * rotation
 
     def get_fft_amps_freqs(self, sampling_rate):
         # TODO: add docstring
         _, signal_length = self.shape
-        freqs = np.fft.fftfreq(signal_length, d=1.0 / sampling_rate)
-        fft_results = np.fft.fft(self.value, axis=1)
-        amplitudes = np.abs(fft_results) / signal_length
+        freqs = self.xp.fft.fftfreq(signal_length, d=1.0 / sampling_rate)
+        fft_results = self.xp.fft.fft(self.value, axis=1)
+        amplitudes = self.xp.abs(fft_results) / signal_length
         return amplitudes, freqs
 
     def save(
@@ -389,3 +403,17 @@ class SingleShot:
         if verbose:
             print(f"[INFO] {filename} has been loaded.")
         return loaded_instance
+
+    def to(self, device: str):
+        if device == self.device:
+            return self
+        self.xp = ArrayModule(device)
+
+        if isinstance(self.value, np.ndarray) and device.startswith("cuda"):
+            self.value = self.xp.array(self.value)
+        elif hasattr(self.value, "get") and device == "cpu":  # CuPy array to NumPy
+            self.value = self.value.get()
+        else:
+            self.value = self.xp.array(self.value)
+
+        return self
