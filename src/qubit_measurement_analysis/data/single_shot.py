@@ -309,27 +309,30 @@ class SingleShot:
                 f"Expecting `self` and `meas_time` have the same last dimension, but got {self.shape[-1]} and {meas_time.shape[-1]}"
             )
 
-        num_freqs = len(intermediate_freq)
-        value_new = self.xp.tile(self.value, (num_freqs, 1))
-        meas_time_new = self.xp.tile(meas_time, (num_freqs, 1))
-        intermediate_freqs = self.xp.array(list(intermediate_freq.values())).reshape(
-            -1, 1
-        )
-        value_new = self._exponential_rotation(
-            value_new, intermediate_freqs, meas_time_new, direction
-        )
-        new_instance = SingleShot(value_new, self.state_regs, True, self.device)
-        return new_instance
+            # Convert intermediate_freq to a CuPy array
+        intermediate_freqs = self.xp.array(
+            list(intermediate_freq.values()), dtype=self.xp.float32
+        ).reshape(-1, 1)
 
-    def _exponential_rotation(self, value, freqs, times, direction):
-        """Apply exponential rotation to the value array."""
-        phase = 2 * self.xp.pi * freqs * times
+        # Reshape meas_time to match the shape required for broadcasting
+        meas_time = meas_time.reshape(1, -1)
+
+        # Calculate phase using broadcasting
+        phase = (
+            2 * self.xp.pi * intermediate_freqs @ meas_time
+        )  # Matrix multiplication for broadcasting
+
+        # Calculate rotation using broadcasting
         rotation = (
             self.xp.exp(-1j * phase)
             if direction == "clockwise"
             else self.xp.exp(1j * phase)
         )
-        return value * rotation
+
+        # Perform the rotation on the value array
+        value_new = self.value * rotation
+        new_instance = SingleShot(value_new, self.state_regs, True, self.device)
+        return new_instance
 
     def get_fft_amps_freqs(self, sampling_rate):
         # TODO: add docstring

@@ -2,36 +2,60 @@
 import os
 import glob
 import warnings
-from typing import List, Union
-
-import numpy as np
+from functools import cached_property
+from typing import List, Callable, Iterator, Iterable
 
 from qubit_measurement_analysis.data.single_shot import SingleShot
+from qubit_measurement_analysis._array_module import ArrayModule
 from qubit_measurement_analysis.visualization.shot_collection_plotter import (
     CollectionPlotter as cp,
 )
 
 
 class ShotCollection:
+    # __slots__ = ("xp", "singleshots", "_plotter")
 
-    def __init__(self, singleshots: list[SingleShot] = None) -> None:
-
-        if singleshots is not None:
-            self.singleshots = singleshots
-            # If singleshots is not none we need to check if several conditions are met:
-            # 1. all data in signleshots list are SingleShot objects
-            # 2. all singleshots have the same q_registers
-            # TODO: 3. all singleshots are demodulated or not demodulated
-
-            # Condition 1
-            if not all(isinstance(s, SingleShot) for s in singleshots):
-                raise TypeError("All elements must be instances of SingleShot")
-            # condition 2
-            if isinstance(self.q_registers, list):
-                raise ValueError("All elements must be from the same qubits")
-        else:
-            self.singleshots: List[SingleShot] = []
+    def __init__(
+        self, singleshots: list[SingleShot] = None, device: str = "cpu"
+    ) -> None:
+        self.xp = ArrayModule(device)
+        self.singleshots = []
         self._plotter = cp(children=self)
+
+        if singleshots:
+            self.extend(singleshots)
+
+    def _validate_shots(self, shots: List[SingleShot]) -> None:
+        if not shots:
+            return  # Empty list is valid
+
+        # 1. Check if all data in shots list are SingleShot objects
+        if not all(isinstance(shot, SingleShot) for shot in shots):
+            raise TypeError("All elements in shots must be SingleShot objects")
+
+        # 2. Check if all singleshots have the same state_regs.keys()
+        first_shot_keys = set(shots[0].state_regs.keys())
+        if not all(set(shot.state_regs.keys()) == first_shot_keys for shot in shots):
+            raise ValueError(
+                "All SingleShot objects must have the same state_regs keys"
+            )
+
+        # 3. Check if all singleshots are either all demodulated or all not demodulated
+        first_shot_demodulated = shots[0].is_demodulated
+        if not all(shot.is_demodulated == first_shot_demodulated for shot in shots):
+            raise ValueError(
+                "All SingleShot objects must have the same demodulation status"
+            )
+
+    def _apply_vectorized(self, func: Callable) -> "ShotCollection":
+        processed_values = func(self.all_values)
+
+        new_shots = [
+            SingleShot(value, state_regs)
+            for value, state_regs in zip(processed_values, self.all_states)
+        ]
+
+        return ShotCollection(new_shots, self.device)
 
     def __getitem__(self, index) -> SingleShot:
         if isinstance(index, tuple):
@@ -46,9 +70,9 @@ class ShotCollection:
                 selected_shots = [selected_shots]
             # Apply shot slices
             new_shots = [shot[shot_slices] for shot in selected_shots]
-            return ShotCollection(new_shots)
+            return ShotCollection(new_shots, self.device)
         elif isinstance(index, slice):
-            return ShotCollection(self.singleshots[index])
+            return ShotCollection(self.singleshots[index], self.device)
         else:
             return self.singleshots[index]
 
@@ -56,7 +80,22 @@ class ShotCollection:
         return len(self.singleshots)
 
     def __repr__(self) -> str:
-        return f"ShotCollection with {len(self.singleshots)} SingleShot instances"
+        return f"ShotCollection(n_shots={len(self)}, device='{self.device}')"
+
+    def __iter__(self) -> Iterator[SingleShot]:
+        return iter(self.singleshots)
+
+    @property
+    def device(self) -> str:
+        return self.xp.device
+
+    def to(self, device: str) -> "ShotCollection":
+        if device == self.device:
+            return self
+        self.xp = ArrayModule(device)
+        for shot in self.singleshots:
+            shot.to(device)
+        return self
 
     @property
     def shape(self):
@@ -72,29 +111,12 @@ class ShotCollection:
         # TODO: add docstring
         return self._plotter.scatter(ax, **kwargs)
 
-    def append(self, object_: Union["SingleShot", "ShotCollection"]):
-        """Append a SingleShot instance to the collection.
+    def append(self, shot: SingleShot) -> None:
+        self.extend([shot])
 
-        Args:
-            singleshots (Union[SingleShot, ShotCollection]): _description_
-        """
-        # TODO: need to check if object is aligned with data in class.
-        # If self.singleshots is not empty we need to check if several conditions of object are met:
-        # 1. all appended data in signleshots list are SingleShot objects
-        # 2. all appended singleshots have the same q_registers
-        # 3. appended all singleshots are demodulated or not demodulated
-
-        # else if self.singleshits is empty list, append anyway
-
-        if isinstance(object_, SingleShot):
-            self.singleshots.append(object_)
-
-        elif isinstance(object_, ShotCollection):
-            self.singleshots.extend(object_.singleshots)
-        else:
-            raise TypeError(
-                "Only SingleShot and ShotCollection instances can be appended"
-            )
+    def extend(self, shots: List[SingleShot]) -> None:
+        self._validate_shots(shots)
+        self.singleshots.extend(shots)
 
     def mean(self, axis: int = -1) -> "SingleShot":
         # TODO: add description to the function
@@ -112,19 +134,21 @@ class ShotCollection:
             return SingleShot(self.all_values.mean(axis), state_regs)
         else:
             axis = axis if axis == -1 else axis - 1
-            return ShotCollection([shot.mean(axis) for shot in self.singleshots])
+            return ShotCollection(
+                [shot.mean(axis) for shot in self.singleshots], self.device
+            )
 
-    @property
+    @cached_property
     def all_values(self):
         """Return a stacked array of all values."""
         values = [shot.value for shot in self.singleshots]
-        return np.stack(values)
+        return self.xp.stack(values)
 
-    @property
+    @cached_property
     def all_states(self):
         """Return a stacked array of all states."""
         states = [shot.state_regs for shot in self.singleshots]
-        return np.stack(states)
+        return self.xp.stack(states)
 
     @property
     def unique_states(self):
@@ -158,22 +182,30 @@ class ShotCollection:
         filtered_singleshots = [
             shot for shot in self.singleshots if shot.state in target_set
         ]
-        return ShotCollection(filtered_singleshots)
+        return ShotCollection(filtered_singleshots, self.device)
 
     def demodulate_all(
-        self, intermediate_freq: dict, meas_time: np.ndarray, direction: str
+        self, intermediate_freq: dict, meas_time: Iterable, direction: str
     ) -> "ShotCollection":
         # TODO: add description to the function
         return ShotCollection(
             [
                 s.demodulate(intermediate_freq, meas_time, direction)
                 for s in self.singleshots
-            ]
+            ],
+            self.device,
         )
 
     def mean_centring_all(self) -> "ShotCollection":
         # TODO: add description to the function
-        return ShotCollection([s.mean_centring() for s in self.singleshots])
+        mean_centered = self.all_values - self.all_values.mean(axis=-1, keepdims=True)
+        return ShotCollection(
+            [
+                SingleShot(value, state_regs, self.is_demodulated, self.device)
+                for value, state_regs in zip(mean_centered, self.all_states)
+            ],
+            self.device,
+        )
 
     def save_all(
         self,
@@ -208,7 +240,7 @@ class ShotCollection:
                     for file in glob.glob(os.path.join(directory, "*.npy")):
                         os.remove(file)
 
-        np.random.shuffle(self.singleshots)
+        self.xp.random.shuffle(self.singleshots)
         num_shots = len(self.singleshots)
         train_end = int(train_ratio * num_shots)
         val_end = train_end + int(val_ratio * num_shots)
