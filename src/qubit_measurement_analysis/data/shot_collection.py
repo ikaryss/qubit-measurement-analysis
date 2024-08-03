@@ -10,6 +10,14 @@ from qubit_measurement_analysis._array_module import ArrayModule
 from qubit_measurement_analysis.visualization.shot_collection_plotter import (
     CollectionPlotter as cp,
 )
+from qubit_measurement_analysis._transformations import (
+    _mean,
+    _mean_filter,
+    _mean_centring,
+    _normalize,
+    _standardize,
+    _demodulate,
+)
 
 
 class ShotCollection:
@@ -20,6 +28,7 @@ class ShotCollection:
     ) -> None:
         self.xp = ArrayModule(device)
         self.singleshots = []
+        self._is_demodulated = None
         self._plotter = cp(children=self)
 
         if singleshots:
@@ -46,12 +55,13 @@ class ShotCollection:
             raise ValueError(
                 "All SingleShot objects must have the same demodulation status"
             )
+        self._is_demodulated = first_shot_demodulated
 
-    def _apply_vectorized(self, func: Callable) -> "ShotCollection":
-        processed_values = func(self.all_values)
+    def _apply_vectorized(self, func: Callable, **kwargs) -> "ShotCollection":
+        processed_values = func(self.all_values, **kwargs)
 
         new_shots = [
-            SingleShot(value, state_regs)
+            SingleShot(value, state_regs, self.is_demodulated, self.device)
             for value, state_regs in zip(processed_values, self.all_states)
         ]
 
@@ -105,7 +115,7 @@ class ShotCollection:
     @property
     def is_demodulated(self):
         # TODO: Change method. I want to get the one unique is_demodulated flag across all singleshot in collection (True or False)
-        return self.singleshots[0].is_demodulated
+        return self._is_demodulated
 
     def scatter(self, ax=None, **kwargs):
         # TODO: add docstring
@@ -133,22 +143,19 @@ class ShotCollection:
                 )
             return SingleShot(self.all_values.mean(axis), state_regs)
         else:
-            axis = axis if axis == -1 else axis - 1
-            return ShotCollection(
-                [shot.mean(axis) for shot in self.singleshots], self.device
-            )
+            return self._apply_vectorized(_mean, axis=axis)
 
-    @cached_property
+    @property
     def all_values(self):
         """Return a stacked array of all values."""
         values = [shot.value for shot in self.singleshots]
         return self.xp.stack(values)
 
-    @cached_property
+    @property
     def all_states(self):
         """Return a stacked array of all states."""
         states = [shot.state_regs for shot in self.singleshots]
-        return self.xp.stack(states)
+        return states
 
     @property
     def unique_states(self):
@@ -188,24 +195,27 @@ class ShotCollection:
         self, intermediate_freq: dict, meas_time: Iterable, direction: str
     ) -> "ShotCollection":
         # TODO: add description to the function
-        return ShotCollection(
-            [
-                s.demodulate(intermediate_freq, meas_time, direction)
-                for s in self.singleshots
-            ],
-            self.device,
+        self._is_demodulated = True
+        return self._apply_vectorized(
+            _demodulate,
+            intermediate_freq=intermediate_freq,
+            meas_time=meas_time,
+            direction=direction,
+            module=self.xp,
         )
 
-    def mean_centring_all(self) -> "ShotCollection":
+    def mean_centring_all(self, axis=-1) -> "ShotCollection":
         # TODO: add description to the function
-        mean_centered = self.all_values - self.all_values.mean(axis=-1, keepdims=True)
-        return ShotCollection(
-            [
-                SingleShot(value, state_regs, self.is_demodulated, self.device)
-                for value, state_regs in zip(mean_centered, self.all_states)
-            ],
-            self.device,
-        )
+        return self._apply_vectorized(_mean_centring, axis=axis)
+
+    def mean_filter_all(self, k):
+        return self._apply_vectorized(_mean_filter, k=k, module=self.xp)
+
+    def normalize_all(self, axis=-1):
+        return self._apply_vectorized(_normalize, axis=axis)
+
+    def standardize_all(self, axis=-1):
+        return self._apply_vectorized(_standardize, axis=axis)
 
     def save_all(
         self,

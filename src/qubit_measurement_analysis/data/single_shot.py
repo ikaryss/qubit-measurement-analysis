@@ -16,6 +16,14 @@ from qubit_measurement_analysis.visualization.single_shot_plotter import (
     SingleShotPlotter as ssp,
 )
 from qubit_measurement_analysis import ArrayModule
+from qubit_measurement_analysis._transformations import (
+    _mean,
+    _mean_filter,
+    _mean_centring,
+    _normalize,
+    _standardize,
+    _demodulate,
+)
 
 DEFAULT_DTYPE: type = np.complex64
 
@@ -174,7 +182,7 @@ class SingleShot:
             >>> print(mean_shot)
             SingleShot(value=[[2.5+2.5j 3.5+3.5j 4.5+4.5j]], state_regs='{0: '0', 1: '1'}')
         """
-        mean_value = self.value.mean(axis, keepdims=True)
+        mean_value = _mean(self.value, axis)
         new_instance = SingleShot(
             mean_value, self.state_regs, self._is_demodulated, self.device
         )
@@ -207,62 +215,35 @@ class SingleShot:
         """
         if k <= 0:
             raise ValueError("k must be positive integer")
-        p = self.shape[-1]
-        diag_offset = self.xp.linspace(-(k // 2), k // 2, k, dtype=int)
-        sparse_matrix = self.xp.scipy.sparse.diags(
-            self.xp.ones((k, p)), offsets=diag_offset, shape=(p, p)
-        )
-        nrmlize = self.xp.ones_like(self.value) @ sparse_matrix
-        new_value = (self.value @ sparse_matrix) / nrmlize
-
+        new_value = _mean_filter(self.value, k, self.xp)
         new_instance = SingleShot(
             new_value, self.state_regs, self._is_demodulated, self.device
         )
         return new_instance
 
-    def mean_centring(self) -> "SingleShot":
-        """Center the SingleShot values by subtracting the mean.
-
-        Returns:
-        SingleShot: A new SingleShot instance with centered values.
-
-        Example:
-        >>> data = np.array([1+1j, 2+2j, 3+3j])
-        >>> state_regs = {0: '0', 1: '1'}
-        >>> single_shot = SingleShot(data, state_regs)
-        >>> centered = single_shot.mean_centring()
-        >>> print(centered)
-        SingleShot(value=[-1.-1.j 0.+0.j 1.+1.j], state_regs='{0: '0', 1: '1'}')
-        """
-        centered_value = self.value - self.mean().value
+    def mean_centring(self, axis=-1) -> "SingleShot":
+        """Center the SingleShot values by subtracting the mean."""
+        centered_value = _mean_centring(self.value, axis)
         new_instance = SingleShot(
             centered_value, self.state_regs, self._is_demodulated, self.device
         )
         return new_instance
 
-    def normalize(self) -> "SingleShot":
+    def normalize(self, axis=-1) -> "SingleShot":
         # TODO: Add docstring
-        norm_value = (self.value - self.value.min()) / (
-            self.value.max() - self.value.min()
-        )
-
+        norm_value = _normalize(self.value, axis)
         new_instance = SingleShot(
             norm_value, self.state_regs, self._is_demodulated, self.device
         )
         return new_instance
 
-    def standardize(self) -> "SingleShot":
+    def standardize(self, axis=-1) -> "SingleShot":
         """Standardize the SingleShot values by subtracting mean and dividing by standard deviation.
 
         Returns:
             SingleShot: A new SingleShot instance with standardized values.
         """
-        std_real = self.value.real.std(-1)
-        std_imag = self.value.imag.std(-1)
-        standardized_value = (self.value - self.value.mean()) / (
-            std_real + std_imag * 1j
-        )
-
+        standardized_value = _standardize(self.value, axis)
         new_instance = SingleShot(
             standardized_value, self.state_regs, self._is_demodulated, self.device
         )
@@ -309,28 +290,9 @@ class SingleShot:
                 f"Expecting `self` and `meas_time` have the same last dimension, but got {self.shape[-1]} and {meas_time.shape[-1]}"
             )
 
-            # Convert intermediate_freq to a CuPy array
-        intermediate_freqs = self.xp.array(
-            list(intermediate_freq.values()), dtype=self.xp.float32
-        ).reshape(-1, 1)
-
-        # Reshape meas_time to match the shape required for broadcasting
-        meas_time = meas_time.reshape(1, -1)
-
-        # Calculate phase using broadcasting
-        phase = (
-            2 * self.xp.pi * intermediate_freqs @ meas_time
-        )  # Matrix multiplication for broadcasting
-
-        # Calculate rotation using broadcasting
-        rotation = (
-            self.xp.exp(-1j * phase)
-            if direction == "clockwise"
-            else self.xp.exp(1j * phase)
+        value_new = _demodulate(
+            self.value, intermediate_freq, meas_time, direction, self.xp
         )
-
-        # Perform the rotation on the value array
-        value_new = self.value * rotation
         new_instance = SingleShot(value_new, self.state_regs, True, self.device)
         return new_instance
 
