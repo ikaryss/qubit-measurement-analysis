@@ -1,3 +1,16 @@
+## 0.6.0 (2024-08-06)
+
+### Feat
+
+- **src/qubit_measurement_analysis/data/shot_collection.py**: add Lazy Evaluation to ShotCollection class
+- move all data transformation functionality from SingleShot and ShotCollection to a single file _transformations.py
+- add device handling to ShotCollection class
+- **src/qubit_measurement_analysis/data/single_shot.py**: add gpu support to SingleShot class
+
+### Refactor
+
+- **src/qubit_measurement_analysis/data/single_shot.py**: minor code changes
+
 ## 0.5.1 (2024-07-26)
 
 ### Fix
