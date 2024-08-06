@@ -25,7 +25,7 @@ from qubit_measurement_analysis._transformations import (
     _demodulate,
 )
 
-DEFAULT_DTYPE: type = np.complex64
+# DEFAULT_DTYPE: type = np.complex64
 
 
 class SingleShot:
@@ -51,13 +51,18 @@ class SingleShot:
         if not isinstance(value, self.xp.ndarray):
             value = self.xp.asarray(value)
 
-        if not np.issubdtype(value.dtype, np.complexfloating):
+        if not self.xp.issubdtype(value.dtype, self.xp.complexfloating):
             raise TypeError("value must be of `np.complexfloating` dtype")
         if value.ndim > 1 and value.shape[0] > 1 and self._is_demodulated is False:
             raise ValueError("value of complex dtype must be 1 dimensional")
 
-        if value.dtype != DEFAULT_DTYPE:
-            value = value.astype(DEFAULT_DTYPE)
+        # if value.dtype != DEFAULT_DTYPE:
+        #     value = value.astype(DEFAULT_DTYPE)
+
+        if value.dtype != self.xp.dtype:
+            print(
+                f"Warning: dtype mismatch. Expected {self.xp.dtype}, got {value.dtype}"
+            )
 
         self.value = value if value.ndim > 1 else value.reshape(1, -1)
         self._state_regs = state_regs
@@ -321,7 +326,7 @@ class SingleShot:
         directory = os.path.join(parent_dir, self.q_registers, self.state, subfolder)
         os.makedirs(directory, exist_ok=True)
         file_path = os.path.join(directory, f"{self.id}.npy")
-        np.save(file_path, self.value)
+        self.xp.save(file_path, self.value)
         if verbose:
             print(f"Saved {self.state} {subfolder} data to {file_path}")
 
@@ -354,7 +359,7 @@ class SingleShot:
         filename = next(x for i, x in enumerate(dir_generator) if i == index)
         _id = os.path.splitext(os.path.basename(filename))[0]
         loaded_file = np.load(filename)
-        if loaded_file.dtype == DEFAULT_DTYPE:
+        if loaded_file.dtype == np.complex64:
             value = loaded_file
             is_demodulated = loaded_file.shape[0] > 1
         else:
@@ -374,7 +379,7 @@ class SingleShot:
             return self
         self.xp = ArrayModule(device)
 
-        if isinstance(self.value, np.ndarray) and device.startswith("cuda"):
+        if isinstance(self.value, self.xp.ndarray) and device.startswith("cuda"):
             self.value = self.xp.array(self.value)
         elif hasattr(self.value, "get") and device == "cpu":  # CuPy array to NumPy
             self.value = self.value.get()

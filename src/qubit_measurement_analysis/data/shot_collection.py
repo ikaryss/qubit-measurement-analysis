@@ -1,9 +1,10 @@
-"Data processing functionality for collection of Shots"
+"""Data processing functionality for collection of Shots"""
+
 import os
 import glob
 import warnings
 from functools import cached_property
-from typing import List, Callable, Iterator, Iterable
+from typing import List, Callable, Iterator, Iterable, Any, Union
 
 from qubit_measurement_analysis.data.single_shot import SingleShot
 from qubit_measurement_analysis._array_module import ArrayModule
@@ -30,6 +31,7 @@ class ShotCollection:
         self.singleshots = []
         self._is_demodulated = None
         self._plotter = cp(children=self)
+        self._ops = []  # List to store lazy operations
 
         if singleshots:
             self.extend(singleshots)
@@ -58,14 +60,8 @@ class ShotCollection:
         self._is_demodulated = first_shot_demodulated
 
     def _apply_vectorized(self, func: Callable, **kwargs) -> "ShotCollection":
-        processed_values = func(self.all_values, **kwargs)
-
-        new_shots = [
-            SingleShot(value, state_regs, self.is_demodulated, self.device)
-            for value, state_regs in zip(processed_values, self.all_states)
-        ]
-
-        return ShotCollection(new_shots, self.device)
+        self._ops.append((func, kwargs))
+        return self
 
     def __getitem__(self, index) -> SingleShot:
         if isinstance(index, tuple):
@@ -90,7 +86,7 @@ class ShotCollection:
         return len(self.singleshots)
 
     def __repr__(self) -> str:
-        return f"ShotCollection(n_shots={len(self)}, device='{self.device}')"
+        return f"ShotCollection(n_shots={len(self)}, device='{self.device}', pending_ops={len(self._ops)})"
 
     def __iter__(self) -> Iterator[SingleShot]:
         return iter(self.singleshots)
@@ -128,7 +124,7 @@ class ShotCollection:
         self._validate_shots(shots)
         self.singleshots.extend(shots)
 
-    def mean(self, axis: int = -1) -> "SingleShot":
+    def mean(self, axis: int = -1) -> Union["SingleShot", "ShotCollection"]:
         # TODO: add description to the function
         if len(self.singleshots) == 0:
             raise ValueError("SignalCollection is empty")
@@ -173,7 +169,6 @@ class ShotCollection:
         unique_registers = set()  # Using a set to store unique classes
 
         for shot in self.singleshots:
-
             unique_registers.add(shot.q_registers)
         return (
             list(unique_registers)
@@ -208,14 +203,59 @@ class ShotCollection:
         # TODO: add description to the function
         return self._apply_vectorized(_mean_centring, axis=axis)
 
-    def mean_filter_all(self, k):
+    def mean_filter_all(self, k) -> "ShotCollection":
         return self._apply_vectorized(_mean_filter, k=k, module=self.xp)
 
-    def normalize_all(self, axis=-1):
+    def normalize_all(self, axis=-1) -> "ShotCollection":
         return self._apply_vectorized(_normalize, axis=axis)
 
-    def standardize_all(self, axis=-1):
+    def standardize_all(self, axis=-1) -> "ShotCollection":
         return self._apply_vectorized(_standardize, axis=axis)
+
+    def compute(self) -> "ShotCollection":
+        """Execute all pending operations on the data."""
+        if not self._ops:
+            return self
+
+        result = self.all_values
+        for func, kwargs in self._ops:
+            result = func(result, **kwargs)
+        if result.dtype != self.xp.complex64:
+            result = result.astype(self.xp.complex64)
+
+        new_shots = [
+            SingleShot(value, state_regs, self.is_demodulated, self.device)
+            for value, state_regs in zip(result, self.all_states)
+        ]
+
+        # result = self.all_values
+        # for func, kwargs in self._ops:
+        #     result = func(result, **kwargs)
+        #     if result.dtype != self.xp.complex64:
+        #         print(
+        #             f"Warning: dtype changed to {result.dtype} after operation {func.__name__}"
+        #         )
+        #         result = result.astype(self.xp.complex64)
+
+        # new_shots = []
+        # for value, state_regs in zip(result, self.all_states):
+        #     try:
+        #         new_shot = SingleShot(
+        #             value, state_regs, self.is_demodulated, self.device
+        #         )
+        #         new_shots.append(new_shot)
+        #     except Exception as e:
+        #         print(f"Error creating SingleShot: {e}")
+        #         print(f"Value shape: {value.shape}")
+        #         print(f"Value dtype: {value.dtype}")
+        #         print(f"State regs: {state_regs}")
+        #         raise
+
+        new_collection = ShotCollection(new_shots, self.device)
+        new_collection._is_demodulated = self._is_demodulated
+        self._ops.clear()
+        self.xp.clear_cache()
+        return new_collection
 
     def save_all(
         self,
