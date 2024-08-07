@@ -144,7 +144,7 @@ class ShotCollection:
     @property
     def all_values(self):
         """Return a stacked array of all values."""
-        values = [shot.value for shot in self.singleshots]
+        values = self.xp.array([shot.value for shot in self.singleshots])
         return self.xp.stack(values)
 
     @property

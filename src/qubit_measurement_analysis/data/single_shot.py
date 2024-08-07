@@ -60,9 +60,7 @@ class SingleShot:
         #     value = value.astype(DEFAULT_DTYPE)
 
         if value.dtype != self.xp.dtype:
-            print(
-                f"Warning: dtype mismatch. Expected {self.xp.dtype}, got {value.dtype}"
-            )
+            value = value.astype(self.xp.dtype)
 
         self.value = value if value.ndim > 1 else value.reshape(1, -1)
         self._state_regs = state_regs
@@ -106,7 +104,7 @@ class SingleShot:
 
             str: String representation of the SingleShot instance.
         """
-        return f"SingleShot(value={self.value}, state_regs='{self.state_regs}')"
+        return f"SingleShot(value={self.value.get()}, state_regs='{self.state_regs}')"
 
     @property
     def is_demodulated(self) -> bool:
