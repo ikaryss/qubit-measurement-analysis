@@ -1,3 +1,11 @@
+## 0.6.1 (2024-08-09)
+
+### Refactor
+
+- **src/qubit_measurement_analysis/data/single_shot.py**: add __slots__ to SingleShot class
+- change extend functionality in ShotCollection class for performance improvements, add small refractor changes
+- add minor improvements
+
 ## 0.6.0 (2024-08-06)
 
 ### Feat
