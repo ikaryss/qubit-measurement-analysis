@@ -1,3 +1,9 @@
+## 0.6.3 (2024-08-09)
+
+### Refactor
+
+- **.github/workflows/bumpversion.yml**: remove if statement from bump version action
+
 ## 0.6.2 (2024-08-09)
 
 ### Refactor
