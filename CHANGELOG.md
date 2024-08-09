@@ -1,3 +1,9 @@
+## 0.6.2 (2024-08-09)
+
+### Refactor
+
+- **.github/workflows/bumpversion.yml**: change bumpversion.yml
+
 ## 0.6.1 (2024-08-09)
 
 ### Refactor
