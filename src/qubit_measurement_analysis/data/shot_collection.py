@@ -3,8 +3,7 @@
 import os
 import glob
 import warnings
-from functools import cached_property
-from typing import List, Callable, Iterator, Iterable, Any, Union
+from typing import List, Callable, Iterator, Iterable, Union
 
 from qubit_measurement_analysis.data.single_shot import SingleShot
 from qubit_measurement_analysis._array_module import ArrayModule
@@ -22,13 +21,14 @@ from qubit_measurement_analysis._transformations import (
 
 
 class ShotCollection:
-    # __slots__ = ("xp", "singleshots", "_plotter")
 
     def __init__(
         self, singleshots: list[SingleShot] = None, device: str = "cpu"
     ) -> None:
         self.xp = ArrayModule(device)
         self.singleshots = []
+        self.all_values = None
+        self.all_states = None
         self._is_demodulated = None
         self._plotter = cp(children=self)
         self._ops = []  # List to store lazy operations
@@ -123,6 +123,19 @@ class ShotCollection:
     def extend(self, shots: List[SingleShot]) -> None:
         self._validate_shots(shots)
         self.singleshots.extend(shots)
+        self._update_arrays()
+        self._update_states()
+
+    def _update_arrays(self):
+        self.all_values = None
+        self.xp.free_all_blocks()  # clear device and pinned cache
+        new_values = self.xp.array([shot.value for shot in self.singleshots])
+        self.all_values = self.xp.stack(new_values)
+
+    def _update_states(self):
+        self.all_states = None
+        new_states = [shot.state_regs for shot in self.singleshots]
+        self.all_states = new_states
 
     def mean(self, axis: int = -1) -> Union["SingleShot", "ShotCollection"]:
         # TODO: add description to the function
@@ -140,18 +153,6 @@ class ShotCollection:
             return SingleShot(self.all_values.mean(axis), state_regs)
         else:
             return self._apply_vectorized(_mean, axis=axis)
-
-    @property
-    def all_values(self):
-        """Return a stacked array of all values."""
-        values = self.xp.array([shot.value for shot in self.singleshots])
-        return self.xp.stack(values)
-
-    @property
-    def all_states(self):
-        """Return a stacked array of all states."""
-        states = [shot.state_regs for shot in self.singleshots]
-        return states
 
     @property
     def unique_states(self):
@@ -191,6 +192,13 @@ class ShotCollection:
     ) -> "ShotCollection":
         # TODO: add description to the function
         self._is_demodulated = True
+
+        # Conversion from dict to array
+        intermediate_freq = self.xp.array(list(intermediate_freq.values())).reshape(
+            -1, 1
+        )
+        # Reshape meas_time to match the shape required for broadcasting
+        meas_time = meas_time.reshape(1, -1)
         return self._apply_vectorized(
             _demodulate,
             intermediate_freq=intermediate_freq,
@@ -212,7 +220,7 @@ class ShotCollection:
     def standardize_all(self, axis=-1) -> "ShotCollection":
         return self._apply_vectorized(_standardize, axis=axis)
 
-    def compute(self) -> "ShotCollection":
+    def compute(self, free_all_blocks=False) -> "ShotCollection":
         """Execute all pending operations on the data."""
         if not self._ops:
             return self
@@ -228,33 +236,11 @@ class ShotCollection:
             for value, state_regs in zip(result, self.all_states)
         ]
 
-        # result = self.all_values
-        # for func, kwargs in self._ops:
-        #     result = func(result, **kwargs)
-        #     if result.dtype != self.xp.complex64:
-        #         print(
-        #             f"Warning: dtype changed to {result.dtype} after operation {func.__name__}"
-        #         )
-        #         result = result.astype(self.xp.complex64)
-
-        # new_shots = []
-        # for value, state_regs in zip(result, self.all_states):
-        #     try:
-        #         new_shot = SingleShot(
-        #             value, state_regs, self.is_demodulated, self.device
-        #         )
-        #         new_shots.append(new_shot)
-        #     except Exception as e:
-        #         print(f"Error creating SingleShot: {e}")
-        #         print(f"Value shape: {value.shape}")
-        #         print(f"Value dtype: {value.dtype}")
-        #         print(f"State regs: {state_regs}")
-        #         raise
-
         new_collection = ShotCollection(new_shots, self.device)
         new_collection._is_demodulated = self._is_demodulated
         self._ops.clear()
-        self.xp.clear_cache()
+        if free_all_blocks:
+            self.xp.free_all_blocks()
         return new_collection
 
     def save_all(

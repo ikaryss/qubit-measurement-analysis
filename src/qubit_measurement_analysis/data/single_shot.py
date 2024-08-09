@@ -49,7 +49,8 @@ class SingleShot:
 
         self.xp = ArrayModule(device)
         if not isinstance(value, self.xp.ndarray):
-            value = self.xp.asarray(value)
+            # value = self.xp.asarray(value)
+            raise TypeError(f"Device mismatch: expected {device=}, got {value.device=}")
 
         if not self.xp.issubdtype(value.dtype, self.xp.complexfloating):
             raise TypeError("value must be of `np.complexfloating` dtype")
@@ -104,7 +105,7 @@ class SingleShot:
 
             str: String representation of the SingleShot instance.
         """
-        return f"SingleShot(value={self.value.get()}, state_regs='{self.state_regs}')"
+        return f"SingleShot(value={self.value}, state_regs='{self.state_regs}')"
 
     @property
     def is_demodulated(self) -> bool:
@@ -292,6 +293,13 @@ class SingleShot:
             raise ValueError(
                 f"Expecting `self` and `meas_time` have the same last dimension, but got {self.shape[-1]} and {meas_time.shape[-1]}"
             )
+
+        # Conversion from dict to array
+        intermediate_freq = self.xp.array(list(intermediate_freq.values())).reshape(
+            -1, 1
+        )
+        # Reshape meas_time to match the shape required for broadcasting
+        meas_time = meas_time.reshape(1, -1)
 
         value_new = _demodulate(
             self.value, intermediate_freq, meas_time, direction, self.xp

@@ -19,8 +19,6 @@ class ArrayModule:
             cuda_device = int(device.split(":")[1]) if ":" in device else 0
             cp.cuda.Device(cuda_device).use()
 
-            self.mem_pool = cp.cuda.MemoryPool(cp.cuda.malloc_managed)
-            cp.cuda.set_allocator(self.mem_pool.malloc)
         else:
             raise ValueError(f"Unsupported device: {device}")
 
@@ -30,12 +28,11 @@ class ArrayModule:
     def __repr__(self) -> str:
         return f"{self.device} array module with {self.np} as numpy and {self.scipy} as scipy"
 
-    def clear_cache(self):
-        if self.device == "cpu":
-            pass
-        else:
-            self.mem_pool.free_all_blocks()
+    def free_all_blocks(self):
+        if self.device.startswith("cuda"):
+            self.get_default_memory_pool().free_all_blocks()
+            self.get_default_pinned_memory_pool().free_all_blocks()
 
     @property
     def dtype(self):
-        return self.np.complex64
+        return self.complex64

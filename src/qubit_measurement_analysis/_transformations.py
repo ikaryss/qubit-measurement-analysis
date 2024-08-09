@@ -34,10 +34,6 @@ def _standardize(array, axis=-1):
 
 
 def _demodulate(array, intermediate_freq, meas_time, direction, module):
-    # Conversion from dict to array
-    intermediate_freq = module.array(list(intermediate_freq.values())).reshape(-1, 1)
-    # Reshape meas_time to match the shape required for broadcasting
-    meas_time = meas_time.reshape(1, -1)
     # Calculate phase using broadcasting
     phase = 2 * module.pi * intermediate_freq @ meas_time
     # Calculate rotation using broadcasting
