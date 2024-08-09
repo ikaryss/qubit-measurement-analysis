@@ -37,6 +37,8 @@ class SingleShot:
     This is implemented as a subclass of a standard numpy array
     """
 
+    __slots__ = ("_is_demodulated", "xp", "value", "_state_regs", "id", "_plotter")
+
     def __init__(
         self,
         value: ArrayLike,
