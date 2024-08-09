@@ -1,6 +1,5 @@
 name: Bump version
 run-name: Deploy by @${{ github.actor }}
-
 on:
   push:
     branches:
@@ -13,17 +12,17 @@ jobs:
     name: "Bump version and create changelog with commitizen"
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
-          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           fetch-depth: 0
+          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
       - name: Create bump and changelog
         uses: commitizen-tools/commitizen-action@master
         with:
           github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           changelog_increment_filename: body.md
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         with:
           body_path: "body.md"
           tag_name: ${{ env.REVISION }}
